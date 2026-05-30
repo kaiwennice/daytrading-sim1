@@ -98,3 +98,29 @@ async def test_account_reflects_position_after_buy(client: AsyncClient):
     # cash 9899.95 + position mark 1*120 = 10019.95 ; unrealized = (120-100)*1 = 20
     assert float(acc["total_equity"]) == 10019.95
     assert float(acc["unrealized_pnl"]) == 20.0
+
+
+async def test_limit_buy_triggers_on_price(client: AsyncClient):
+    from services.matching_engine import MatchingEngine
+    from services.market_feed import feed
+    from tests.conftest import TestSession
+
+    headers = await _auth(client)
+    # resting buy limit @ 90
+    oid = (await client.post(
+        "/orders",
+        json={"symbol": "BTC-USDT", "side": "buy", "order_type": "limit",
+              "quantity": "1", "price": "90"},
+        headers=headers,
+    )).json()["id"]
+
+    await feed.set_price("BTC-USDT", Decimal("89"))
+    engine = MatchingEngine(feed.get_price, session_factory=TestSession)
+    await engine.on_price("BTC-USDT", Decimal("89"))
+
+    # order should now be filled and gone from open list
+    open_orders = (await client.get("/orders", headers=headers)).json()
+    assert open_orders == []
+    acc = (await client.get("/account", headers=headers)).json()
+    # filled 1 @ 89, fee 89*0.0005=0.0445 -> balance 10000 - 89.0445
+    assert float(acc["balance_usdt"]) == 9910.9555
