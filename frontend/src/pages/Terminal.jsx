@@ -1,25 +1,35 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 import ChartPanel from "../components/ChartPanel.jsx";
-import client from "../api/client";
+import OrderPanel from "../components/OrderPanel.jsx";
+import PositionPanel from "../components/PositionPanel.jsx";
+import TradeHistory from "../components/TradeHistory.jsx";
+import { getAccount, listOrders, listPositions, listTrades } from "../api/orders";
+import { useAccountWS } from "../hooks/useAccountWS";
 import { useAuthStore, useTradeStore } from "../store";
 
 export default function Terminal() {
   const email = useAuthStore((s) => s.email);
   const logout = useAuthStore((s) => s.logout);
-  const account = useTradeStore((s) => s.account);
-  const setAccount = useTradeStore((s) => s.setAccount);
   const navigate = useNavigate();
+  const account = useTradeStore((s) => s.account);
+  const { setAccount, setOrders, setPositions, setTrades } = useTradeStore.getState();
 
-  useEffect(() => {
-    client.get("/account").then((r) => setAccount(r.data)).catch(() => {});
-  }, [setAccount]);
+  const refresh = useCallback(async () => {
+    const [acc, ords, pos, trs] = await Promise.all([
+      getAccount(), listOrders(), listPositions(), listTrades(),
+    ]);
+    setAccount(acc);
+    setOrders(ords);
+    setPositions(pos);
+    setTrades(trs);
+  }, [setAccount, setOrders, setPositions, setTrades]);
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login");
-  };
+  useEffect(() => { refresh().catch(() => {}); }, [refresh]);
+  useAccountWS(useCallback(() => { refresh().catch(() => {}); }, [refresh]));
+
+  const handleLogout = () => { logout(); navigate("/login"); };
 
   return (
     <div className="terminal">
@@ -27,19 +37,22 @@ export default function Terminal() {
         <span className="brand-sm">DaySim</span>
         <div className="account-box">
           {account && (
-            <span className="balance">
-              余额: ${Number(account.balance_usdt).toLocaleString()} USDT
-            </span>
+            <>
+              <span className="balance">余额 ${Number(account.balance_usdt).toLocaleString()}</span>
+              <span className="balance">权益 ${Number(account.total_equity).toLocaleString()}</span>
+            </>
           )}
           <span className="email">{email}</span>
           <button className="link" onClick={handleLogout}>登出</button>
         </div>
       </header>
-
       <main className="terminal-body">
         <ChartPanel />
-        <aside className="panel order-placeholder">下单面板（Phase B）</aside>
-        <section className="panel table-placeholder">持仓 / 成交（Phase B）</section>
+        <OrderPanel onPlaced={refresh} />
+        <section className="bottom-panels">
+          <PositionPanel onChange={refresh} />
+          <TradeHistory />
+        </section>
       </main>
     </div>
   );

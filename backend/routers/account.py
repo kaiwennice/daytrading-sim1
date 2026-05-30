@@ -1,7 +1,9 @@
+import uuid
+from datetime import datetime
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -76,3 +78,50 @@ async def reset_account(
     await db.commit()
     await db.refresh(account)
     return await _build_response(db, account)
+
+
+class TradeItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    symbol: str
+    side: str
+    quantity: Decimal
+    price: Decimal
+    realized_pnl: Decimal | None
+    executed_at: datetime
+
+
+class PositionItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    symbol: str
+    side: str
+    quantity: Decimal
+    avg_cost: Decimal
+
+
+@router.get("/trades", response_model=list[TradeItem])
+async def list_trades(
+    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+) -> list[Trade]:
+    account = await db.scalar(select(Account).where(Account.user_id == user.id))
+    return list(
+        (
+            await db.scalars(
+                select(Trade)
+                .where(Trade.account_id == account.id)
+                .order_by(Trade.executed_at.desc())
+                .limit(100)
+            )
+        ).all()
+    )
+
+
+@router.get("/positions", response_model=list[PositionItem])
+async def list_positions(
+    user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+) -> list[Position]:
+    account = await db.scalar(select(Account).where(Account.user_id == user.id))
+    return list(
+        (await db.scalars(select(Position).where(Position.account_id == account.id))).all()
+    )
