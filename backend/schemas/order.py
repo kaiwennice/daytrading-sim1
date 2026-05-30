@@ -16,7 +16,7 @@ class OrderCreate(BaseModel):
     quantity: Decimal = Field(gt=0)
     price: Decimal | None = Field(default=None, gt=0)
     trigger_price: Decimal | None = Field(default=None, gt=0)
-    leverage: int = Field(default=1, ge=1, le=20)
+    leverage: int = Field(default=1, ge=1, le=100)
 
     @model_validator(mode="after")
     def _check_fields(self):

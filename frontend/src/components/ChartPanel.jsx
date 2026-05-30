@@ -44,7 +44,18 @@ export default function ChartPanel() {
 
   useMarketWS({ onSnapshot, onCandle });
 
-  const SYMBOLS = ["BTC-USDT", "ETH-USDT", "SOL-USDT"];
+  const SYMBOLS = [
+    "BTC-USDT",  "ETH-USDT",  "BNB-USDT",  "SOL-USDT",  "XRP-USDT",
+    "DOGE-USDT", "TON-USDT",  "ADA-USDT",  "TRX-USDT",  "AVAX-USDT",
+    "SHIB-USDT", "LINK-USDT", "DOT-USDT",  "BCH-USDT",  "NEAR-USDT",
+    "UNI-USDT",  "LTC-USDT",  "APT-USDT",  "ICP-USDT",  "SUI-USDT",
+    "ETC-USDT",  "FIL-USDT",  "ARB-USDT",  "OP-USDT",   "ATOM-USDT",
+    "VET-USDT",  "HBAR-USDT", "MKR-USDT",  "GRT-USDT",  "ALGO-USDT",
+    "XLM-USDT",  "AAVE-USDT", "INJ-USDT",  "WLD-USDT",  "SEI-USDT",
+    "EGLD-USDT", "CRV-USDT",  "LDO-USDT",  "PEPE-USDT", "FLOKI-USDT",
+    "STX-USDT",  "IMX-USDT",  "MANA-USDT", "SAND-USDT", "EOS-USDT",
+    "TIA-USDT",  "WIF-USDT",  "JUP-USDT",  "SNX-USDT",  "PYTH-USDT",
+  ];
   const TIMEFRAMES = ["1m", "5m", "15m", "1H"];
 
   return (

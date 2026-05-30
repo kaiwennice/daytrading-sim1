@@ -72,7 +72,7 @@ export default function OrderPanel({ onPlaced }) {
           <>
             <label>杠杆</label>
             <div className="leverage-group">
-              {[1, 2, 3, 5, 10, 20].map((lv) => (
+              {[1, 2, 3, 5, 10, 20, 50, 100].map((lv) => (
                 <button
                   key={lv}
                   type="button"

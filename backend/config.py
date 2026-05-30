@@ -22,8 +22,19 @@ class Settings(BaseSettings):
     smtp_from: str = ""
     smtp_ssl: bool = True
 
-    # Market data (OKX crypto spot)
-    symbols: list[str] = ["BTC-USDT", "ETH-USDT", "SOL-USDT"]
+    # Market data (OKX crypto spot) — top 50 by market cap (stablecoins excluded)
+    symbols: list[str] = [
+        "BTC-USDT",  "ETH-USDT",  "BNB-USDT",  "SOL-USDT",  "XRP-USDT",
+        "DOGE-USDT", "TON-USDT",  "ADA-USDT",  "TRX-USDT",  "AVAX-USDT",
+        "SHIB-USDT", "LINK-USDT", "DOT-USDT",  "BCH-USDT",  "NEAR-USDT",
+        "UNI-USDT",  "LTC-USDT",  "APT-USDT",  "ICP-USDT",  "SUI-USDT",
+        "ETC-USDT",  "FIL-USDT",  "ARB-USDT",  "OP-USDT",   "ATOM-USDT",
+        "VET-USDT",  "HBAR-USDT", "MKR-USDT",  "GRT-USDT",  "ALGO-USDT",
+        "XLM-USDT",  "AAVE-USDT", "INJ-USDT",  "WLD-USDT",  "SEI-USDT",
+        "EGLD-USDT", "CRV-USDT",  "LDO-USDT",  "PEPE-USDT", "FLOKI-USDT",
+        "STX-USDT",  "IMX-USDT",  "MANA-USDT", "SAND-USDT", "EOS-USDT",
+        "TIA-USDT",  "WIF-USDT",  "JUP-USDT",  "SNX-USDT",  "PYTH-USDT",
+    ]
     timeframes: list[str] = ["1m", "5m", "15m", "1H"]
     taker_fee: Decimal = Decimal("0.0005")
     okx_rest_base: str = "https://www.okx.com"
