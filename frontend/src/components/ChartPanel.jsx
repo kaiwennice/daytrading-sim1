@@ -35,6 +35,12 @@ export default function ChartPanel() {
     return () => chart.remove();
   }, []);
 
+  // Clear stale candles immediately when symbol or timeframe changes,
+  // before the new WS snapshot arrives.
+  useEffect(() => {
+    seriesRef.current?.setData([]);
+  }, [symbol, timeframe]);
+
   const onSnapshot = useCallback((candles) => {
     seriesRef.current?.setData(candles);
   }, []);

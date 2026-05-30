@@ -23,6 +23,9 @@ export function useMarketWS({ onSnapshot, onCandle }) {
       }
     };
 
-    return () => ws.close();
+    return () => {
+      ws.onmessage = null;  // prevent stale messages from a closing connection updating the chart
+      ws.close();
+    };
   }, [symbol, timeframe, onSnapshot, onCandle, setLastPrice]);
 }
