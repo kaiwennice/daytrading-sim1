@@ -82,3 +82,19 @@ async def test_cancel_open_order(client: AsyncClient):
     assert r.status_code == 200
     open_orders = (await client.get("/orders", headers=headers)).json()
     assert open_orders == []
+
+
+async def test_account_reflects_position_after_buy(client: AsyncClient):
+    headers = await _auth(client)
+    await _set_price("BTC-USDT", "100")
+    await client.post(
+        "/orders",
+        json={"symbol": "BTC-USDT", "side": "buy", "order_type": "market", "quantity": "1"},
+        headers=headers,
+    )
+    # price moves up to 120
+    await _set_price("BTC-USDT", "120")
+    acc = (await client.get("/account", headers=headers)).json()
+    # cash 9899.95 + position mark 1*120 = 10019.95 ; unrealized = (120-100)*1 = 20
+    assert float(acc["total_equity"]) == 10019.95
+    assert float(acc["unrealized_pnl"]) == 20.0
