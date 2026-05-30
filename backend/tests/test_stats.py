@@ -23,3 +23,26 @@ def test_win_rate_and_ratio():
     assert s["avg_loss"] == Decimal("-20")        # (-20)/1
     assert s["profit_loss_ratio"] == 2.0          # 40 / 20
     assert s["total_realized_pnl"] == Decimal("60")
+
+
+from httpx import AsyncClient
+
+from tests.test_orders import _auth, _set_price
+
+
+async def test_stats_endpoint_after_round_trip(client: AsyncClient):
+    headers = await _auth(client)
+    await _set_price("BTC-USDT", "100")
+    await client.post("/orders", json={"symbol": "BTC-USDT", "side": "buy",
+        "order_type": "market", "quantity": "1"}, headers=headers)
+    await _set_price("BTC-USDT", "150")
+    await client.post("/orders", json={"symbol": "BTC-USDT", "side": "sell",
+        "order_type": "market", "quantity": "1"}, headers=headers)
+
+    r = await client.get("/stats", headers=headers)
+    assert r.status_code == 200
+    body = r.json()
+    assert body["closed_count"] == 1
+    assert body["win_count"] == 1
+    assert body["win_rate"] == 1.0
+    assert len(body["equity_curve"]) >= 2
