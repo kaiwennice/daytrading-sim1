@@ -30,6 +30,8 @@ async def create_order(
     db: AsyncSession = Depends(get_db),
 ) -> Order:
     account = await _account_for(db, user)
+    if account is None:
+        raise HTTPException(status_code=404, detail="Account not found")
     order = Order(
         account_id=account.id,
         symbol=body.symbol,
@@ -43,23 +45,26 @@ async def create_order(
     db.add(order)
     await db.flush()
 
+    price = None
     if body.order_type == "market":
         price = feed.get_price(body.symbol)
         if price is None:
+            await db.rollback()
             raise HTTPException(status_code=503, detail="No market price available")
         try:
             await fill_order(db, account, order, price, feed.get_price)
         except ValueError as exc:
+            await db.rollback()
             raise HTTPException(status_code=400, detail=str(exc))
 
     await db.commit()
     await db.refresh(order)
 
-    if body.order_type == "market":
+    if body.order_type == "market" and price is not None:
         await hub.push(
             account.id,
             {"type": "fill", "symbol": order.symbol, "side": order.side,
-             "quantity": str(order.quantity), "price": str(feed.get_price(order.symbol))},
+             "quantity": str(order.quantity), "price": str(price)},
         )
 
     return order
@@ -70,6 +75,8 @@ async def list_open_orders(
     user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ) -> list[Order]:
     account = await db.scalar(select(Account).where(Account.user_id == user.id))
+    if account is None:
+        raise HTTPException(status_code=404, detail="Account not found")
     return list(
         (
             await db.scalars(
@@ -88,8 +95,10 @@ async def cancel_order(
     db: AsyncSession = Depends(get_db),
 ) -> dict:
     account = await db.scalar(select(Account).where(Account.user_id == user.id))
+    if account is None:
+        raise HTTPException(status_code=404, detail="Account not found")
     order = await db.scalar(
-        select(Order).where(Order.id == order_id, Order.account_id == account.id)
+        select(Order).where(Order.id == order_id, Order.account_id == account.id).with_for_update()
     )
     if order is None:
         raise HTTPException(status_code=404, detail="Order not found")
