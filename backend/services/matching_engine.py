@@ -35,7 +35,9 @@ async def _record_equity(db, account: Account, get_price) -> None:
     ).all()
     equity = account.balance_usdt
     for p in positions:
-        mark = get_price(p.symbol) or p.avg_cost
+        mark = get_price(p.symbol)
+        if mark is None:
+            mark = p.avg_cost
         equity += p.quantity * mark
     db.add(EquitySnapshot(account_id=account.id, total_equity=equity))
 
@@ -98,6 +100,7 @@ async def fill_order(db, account: Account, order: Order, price: Decimal, get_pri
         realized_pnl=realized,
     )
     db.add(trade)
+    await db.flush()
     await _record_equity(db, account, get_price)
     return trade
 
@@ -144,7 +147,8 @@ class MatchingEngine:
                     try:
                         trade = await fill_order(db, account, order, price, self._get_price)
                         fired.append((account.id, trade))
-                    except ValueError:
+                    except ValueError as exc:
+                        logger.warning("order %s cancelled during fill: %s", order.id, exc)
                         order.status = "cancelled"
                 await db.commit()
 
