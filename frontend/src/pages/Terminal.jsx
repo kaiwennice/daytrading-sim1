@@ -1,9 +1,10 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import ChartPanel from "../components/ChartPanel.jsx";
 import OrderPanel from "../components/OrderPanel.jsx";
 import PositionPanel from "../components/PositionPanel.jsx";
+import StatsModal from "../components/StatsModal.jsx";
 import TradeHistory from "../components/TradeHistory.jsx";
 import { getAccount, listOrders, listPositions, listTrades } from "../api/orders";
 import { useAccountWS } from "../hooks/useAccountWS";
@@ -29,6 +30,7 @@ export default function Terminal() {
   useEffect(() => { refresh().catch(() => {}); }, [refresh]);
   useAccountWS(useCallback(() => { refresh().catch(() => {}); }, [refresh]));
 
+  const [showStats, setShowStats] = useState(false);
   const handleLogout = () => { logout(); navigate("/login"); };
 
   return (
@@ -43,6 +45,7 @@ export default function Terminal() {
             </>
           )}
           <span className="email">{email}</span>
+          <button className="link" onClick={() => setShowStats(true)}>绩效</button>
           <button className="link" onClick={handleLogout}>登出</button>
         </div>
       </header>
@@ -54,6 +57,7 @@ export default function Terminal() {
           <TradeHistory />
         </section>
       </main>
+      {showStats && <StatsModal onClose={() => setShowStats(false)} />}
     </div>
   );
 }
