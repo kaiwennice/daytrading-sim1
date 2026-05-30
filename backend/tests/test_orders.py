@@ -154,6 +154,37 @@ async def test_leveraged_buy_uses_margin_only(client: AsyncClient):
     assert float(pos["liquidation_price"]) == pytest.approx(51.0, rel=1e-4)
 
 
+async def test_leveraged_sell_uses_position_leverage(client: AsyncClient):
+    """Selling a 2x leveraged position should return margin+pnl, not full proceeds."""
+    headers = await _auth(client)
+    await _set_price("BTC-USDT", "100")
+
+    # Buy 1 BTC @ 100 with 2x leverage: cost = 50 + 0.05 = 50.05
+    await client.post(
+        "/orders",
+        json={"symbol": "BTC-USDT", "side": "buy", "order_type": "market",
+              "quantity": "1", "leverage": 2},
+        headers=headers,
+    )
+    acc = (await client.get("/account", headers=headers)).json()
+    assert float(acc["balance_usdt"]) == pytest.approx(9949.95, rel=1e-6)
+
+    # Sell 1 BTC @ 100 (same price): balance_change = 99.95 - 100*0.5 = 49.95
+    # Net from round trip = -50.05 + 49.95 = -0.10 (fees only)
+    await client.post(
+        "/orders",
+        json={"symbol": "BTC-USDT", "side": "sell", "order_type": "market", "quantity": "1"},
+        headers=headers,
+    )
+    acc = (await client.get("/account", headers=headers)).json()
+    # Correct (2x leverage): 9949.95 + 49.95 = 9999.90
+    # WRONG (1x fallback):   9949.95 + 99.95 = 10049.90
+    assert float(acc["balance_usdt"]) == pytest.approx(9999.90, rel=1e-6)
+    # position should be gone
+    positions = (await client.get("/account/positions", headers=headers)).json()
+    assert positions == []
+
+
 async def test_liquidation_triggers_on_price_drop(client: AsyncClient):
     """A 10x leveraged position should be liquidated when price drops to liq price."""
     from services.matching_engine import MatchingEngine

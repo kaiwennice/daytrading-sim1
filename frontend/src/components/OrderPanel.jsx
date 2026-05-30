@@ -6,6 +6,8 @@ import { useTradeStore } from "../store";
 export default function OrderPanel({ onPlaced }) {
   const symbol = useTradeStore((s) => s.symbol);
   const lastPrice = useTradeStore((s) => s.lastPrice);
+  const positions = useTradeStore((s) => s.positions);
+  const currentPos = positions.find((p) => p.symbol === symbol);
   const [side, setSide] = useState("buy");
   const [orderType, setOrderType] = useState("market");
   const [quantity, setQuantity] = useState("");
@@ -84,6 +86,16 @@ export default function OrderPanel({ onPlaced }) {
               ))}
             </div>
           </>
+        )}
+
+        {side === "sell" && currentPos && (
+          <div className="pos-info">
+            <span>持仓 {currentPos.leverage}x 杠杆</span>
+            <span>均价 {Number(currentPos.avg_cost).toLocaleString()}</span>
+            {currentPos.liquidation_price && (
+              <span className="down">爆仓 {Number(currentPos.liquidation_price).toLocaleString()}</span>
+            )}
+          </div>
         )}
 
         {error && <div className="error">{error}</div>}
