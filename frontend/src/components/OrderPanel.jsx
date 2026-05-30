@@ -12,6 +12,12 @@ export default function OrderPanel({ onPlaced }) {
   const [price, setPrice] = useState("");
   const [trigger, setTrigger] = useState("");
   const [error, setError] = useState("");
+  const [leverage, setLeverage] = useState(1);
+
+  const handleSideChange = (newSide) => {
+    setSide(newSide);
+    if (newSide === "sell") setLeverage(1);
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -20,6 +26,7 @@ export default function OrderPanel({ onPlaced }) {
       const payload = { symbol, side, order_type: orderType, quantity };
       if (orderType === "limit") payload.price = price;
       if (orderType === "stop_loss" || orderType === "take_profit") payload.trigger_price = trigger;
+      if (side === "buy") payload.leverage = leverage;
       await placeOrder(payload);
       setQuantity("");
       setPrice("");
@@ -33,8 +40,8 @@ export default function OrderPanel({ onPlaced }) {
   return (
     <aside className="order-panel">
       <div className="side-toggle">
-        <button className={side === "buy" ? "buy active" : "buy"} onClick={() => setSide("buy")}>买入</button>
-        <button className={side === "sell" ? "sell active" : "sell"} onClick={() => setSide("sell")}>卖出</button>
+        <button className={side === "buy" ? "buy active" : "buy"} onClick={() => handleSideChange("buy")}>买入</button>
+        <button className={side === "sell" ? "sell active" : "sell"} onClick={() => handleSideChange("sell")}>卖出</button>
       </div>
       <form onSubmit={submit}>
         <label>类型</label>
@@ -58,6 +65,24 @@ export default function OrderPanel({ onPlaced }) {
           <>
             <label>触发价</label>
             <input value={trigger} onChange={(e) => setTrigger(e.target.value)} required />
+          </>
+        )}
+
+        {side === "buy" && (orderType === "market" || orderType === "limit") && (
+          <>
+            <label>杠杆</label>
+            <div className="leverage-group">
+              {[1, 2, 3, 5, 10, 20].map((lv) => (
+                <button
+                  key={lv}
+                  type="button"
+                  className={leverage === lv ? "lv active" : "lv"}
+                  onClick={() => setLeverage(lv)}
+                >
+                  {lv}x
+                </button>
+              ))}
+            </div>
           </>
         )}
 

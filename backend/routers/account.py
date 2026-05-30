@@ -98,6 +98,8 @@ class PositionItem(BaseModel):
     side: str
     quantity: Decimal
     avg_cost: Decimal
+    leverage: int
+    liquidation_price: Decimal | None
 
 
 @router.get("/trades", response_model=list[TradeItem])

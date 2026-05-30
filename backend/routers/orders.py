@@ -41,6 +41,7 @@ async def create_order(
         price=body.price,
         trigger_price=body.trigger_price,
         status="open",
+        leverage=body.leverage,
     )
     db.add(order)
     await db.flush()

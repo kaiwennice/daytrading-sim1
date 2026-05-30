@@ -16,6 +16,7 @@ class OrderCreate(BaseModel):
     quantity: Decimal = Field(gt=0)
     price: Decimal | None = Field(default=None, gt=0)
     trigger_price: Decimal | None = Field(default=None, gt=0)
+    leverage: int = Field(default=1, ge=1, le=20)
 
     @model_validator(mode="after")
     def _check_fields(self):
@@ -25,6 +26,8 @@ class OrderCreate(BaseModel):
             raise ValueError("trigger order requires trigger_price")
         if self.order_type in ("stop_loss", "take_profit") and self.side != "sell":
             raise ValueError("stop_loss/take_profit must be sell-to-close")
+        if self.order_type in ("stop_loss", "take_profit") and self.leverage != 1:
+            raise ValueError("stop_loss/take_profit cannot use leverage")
         return self
 
 
@@ -39,4 +42,5 @@ class OrderResponse(BaseModel):
     price: Decimal | None
     trigger_price: Decimal | None
     status: str
+    leverage: int
     created_at: datetime

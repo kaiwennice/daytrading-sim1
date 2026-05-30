@@ -1,4 +1,4 @@
-import { cancelOrder } from "../api/orders";
+import { cancelOrder, placeOrder } from "../api/orders";
 import { useTradeStore } from "../store";
 
 export default function PositionPanel({ onChange }) {
@@ -11,11 +11,16 @@ export default function PositionPanel({ onChange }) {
     onChange?.();
   };
 
+  const closePosition = async (p) => {
+    await placeOrder({ symbol: p.symbol, side: "sell", order_type: "market", quantity: p.quantity });
+    onChange?.();
+  };
+
   return (
     <div className="pos-panel">
       <h4>持仓</h4>
       <table>
-        <thead><tr><th>品种</th><th>数量</th><th>均价</th><th>浮动盈亏</th></tr></thead>
+        <thead><tr><th>品种</th><th>数量</th><th>均价</th><th>浮动盈亏</th><th>杠杆</th><th>爆仓价</th><th></th></tr></thead>
         <tbody>
           {positions.map((p) => {
             const mark = Number(lastPrice) || Number(p.avg_cost);
@@ -26,10 +31,13 @@ export default function PositionPanel({ onChange }) {
                 <td>{p.quantity}</td>
                 <td>{Number(p.avg_cost).toLocaleString()}</td>
                 <td className={upnl >= 0 ? "up" : "down"}>{upnl.toFixed(2)}</td>
+                <td>{p.leverage > 1 ? `${p.leverage}x` : "1x"}</td>
+                <td className="down">{p.liquidation_price ? Number(p.liquidation_price).toLocaleString() : "—"}</td>
+                <td><button className="link close-btn" onClick={() => closePosition(p)}>平仓</button></td>
               </tr>
             );
           })}
-          {positions.length === 0 && <tr><td colSpan={4} className="empty">无持仓</td></tr>}
+          {positions.length === 0 && <tr><td colSpan={7} className="empty">无持仓</td></tr>}
         </tbody>
       </table>
 

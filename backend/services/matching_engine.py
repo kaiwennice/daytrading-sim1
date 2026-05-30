@@ -49,6 +49,8 @@ async def fill_order(db, account: Account, order: Order, price: Decimal, get_pri
     pos_avg = pos.avg_cost if pos else Decimal("0")
 
     if order.side == "buy":
+        order_leverage = order.leverage if order.leverage is not None else 1
+        pos_leverage = pos.leverage if (pos is not None and pos.leverage is not None) else 1
         res = apply_buy(
             balance=account.balance_usdt,
             pos_qty=pos_qty,
@@ -56,23 +58,29 @@ async def fill_order(db, account: Account, order: Order, price: Decimal, get_pri
             qty=order.quantity,
             price=price,
             fee_rate=settings.taker_fee,
+            leverage=order_leverage,
+            pos_leverage=pos_leverage,
         )
         account.balance_usdt = res.new_balance
         if pos is None:
-            db.add(
-                Position(
-                    account_id=account.id,
-                    symbol=order.symbol,
-                    side="long",
-                    quantity=res.new_qty,
-                    avg_cost=res.new_avg,
-                )
+            new_pos = Position(
+                account_id=account.id,
+                symbol=order.symbol,
+                side="long",
+                quantity=res.new_qty,
+                avg_cost=res.new_avg,
+                leverage=res.new_leverage,
+                liquidation_price=res.liquidation_price,
             )
+            db.add(new_pos)
         else:
             pos.quantity = res.new_qty
             pos.avg_cost = res.new_avg
+            pos.leverage = res.new_leverage
+            pos.liquidation_price = res.liquidation_price
         fee, realized = res.fee, None
     else:
+        pos_leverage = pos.leverage if (pos is not None and pos.leverage is not None) else 1
         res = apply_sell(
             balance=account.balance_usdt,
             pos_qty=pos_qty,
@@ -80,12 +88,15 @@ async def fill_order(db, account: Account, order: Order, price: Decimal, get_pri
             qty=order.quantity,
             price=price,
             fee_rate=settings.taker_fee,
+            pos_leverage=pos_leverage,
         )
         account.balance_usdt = res.new_balance
         if res.new_qty == 0 and pos is not None:
             await db.delete(pos)
         elif pos is not None:
             pos.quantity = res.new_qty
+            if res.new_qty > 0:
+                pos.liquidation_price = res.liquidation_price
         fee, realized = res.fee, res.realized_pnl
 
     order.status = "filled"
@@ -150,6 +161,41 @@ class MatchingEngine:
                     except ValueError as exc:
                         logger.warning("order %s cancelled during fill: %s", order.id, exc)
                         order.status = "cancelled"
+
+                # Check liquidations for leveraged long positions
+                liq_positions = (
+                    await db.scalars(
+                        select(Position).where(
+                            Position.symbol == symbol,
+                            Position.leverage > 1,
+                            Position.liquidation_price.isnot(None),
+                            Position.liquidation_price >= price,
+                        ).with_for_update()
+                    )
+                ).all()
+                for lpos in liq_positions:
+                    liq_account = await db.scalar(
+                        select(Account).where(Account.id == lpos.account_id).with_for_update()
+                    )
+                    liq_order = Order(
+                        id=uuid.uuid4(),
+                        account_id=lpos.account_id,
+                        symbol=lpos.symbol,
+                        side="sell",
+                        order_type="market",
+                        quantity=lpos.quantity,
+                        status="open",
+                        leverage=1,
+                    )
+                    db.add(liq_order)
+                    await db.flush()
+                    try:
+                        trade = await fill_order(db, liq_account, liq_order, price, self._get_price)
+                        fired.append((lpos.account_id, trade))
+                        logger.warning("liquidated position %s at %s", lpos.id, price)
+                    except ValueError as exc:
+                        logger.error("liquidation failed for position %s: %s", lpos.id, exc)
+
                 await db.commit()
 
             for account_id, trade in fired:

@@ -162,6 +162,10 @@ body {
   padding: 0 4px;
 }
 
+.close-btn {
+  color: #ea3943;
+}
+
 /* ---------- Terminal ---------- */
 .terminal {
   display: flex;
@@ -279,3 +283,26 @@ body {
 .metrics span { color: var(--text-dim); font-size: 12px; }
 .metrics b { font-size: 20px; font-variant-numeric: tabular-nums; }
 .equity-chart { height: 260px; }
+
+.leverage-group {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.lv {
+  flex: 1;
+  padding: 3px 0;
+  background: #1f2530;
+  border: 1px solid #2d3748;
+  color: #9ca3af;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.lv.active {
+  background: #2d3748;
+  border-color: var(--accent);
+  color: var(--accent);
+}

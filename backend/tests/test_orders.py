@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+import pytest
 from httpx import AsyncClient
 
 from tests.test_auth import _register_capturing_code, _verify, _login, DEFAULT_EMAIL
@@ -124,3 +125,62 @@ async def test_limit_buy_triggers_on_price(client: AsyncClient):
     acc = (await client.get("/account", headers=headers)).json()
     # filled 1 @ 89, fee 89*0.0005=0.0445 -> balance 10000 - 89.0445
     assert float(acc["balance_usdt"]) == 9910.9555
+
+
+async def test_leveraged_buy_uses_margin_only(client: AsyncClient):
+    """Leverage=2 should deduct margin (notional/2) + fee, not full notional."""
+    headers = await _auth(client)
+    await _set_price("BTC-USDT", "100")
+    r = await client.post(
+        "/orders",
+        json={"symbol": "BTC-USDT", "side": "buy", "order_type": "market",
+              "quantity": "1", "leverage": 2},
+        headers=headers,
+    )
+    assert r.status_code == 201
+    assert r.json()["status"] == "filled"
+    assert r.json()["leverage"] == 2
+
+    acc = (await client.get("/account", headers=headers)).json()
+    # notional=100, margin=50, fee=100*0.0005=0.05, total_cost=50.05
+    # new_balance = 10000 - 50.05 = 9949.95
+    assert float(acc["balance_usdt"]) == 9949.95
+
+    positions = (await client.get("/account/positions", headers=headers)).json()
+    assert len(positions) == 1
+    pos = positions[0]
+    assert pos["leverage"] == 2
+    # liquidation_price = 100 * (1 - 1/2 + 0.01) = 100 * 0.51 = 51
+    assert float(pos["liquidation_price"]) == pytest.approx(51.0, rel=1e-4)
+
+
+async def test_liquidation_triggers_on_price_drop(client: AsyncClient):
+    """A 10x leveraged position should be liquidated when price drops to liq price."""
+    from services.matching_engine import MatchingEngine
+    from services.market_feed import feed
+    from tests.conftest import TestSession
+
+    headers = await _auth(client)
+    await feed.set_price("BTC-USDT", Decimal("100"))
+
+    # Buy 1 BTC @ 100 with leverage=10
+    r = await client.post(
+        "/orders",
+        json={"symbol": "BTC-USDT", "side": "buy", "order_type": "market",
+              "quantity": "1", "leverage": 10},
+        headers=headers,
+    )
+    assert r.status_code == 201
+
+    positions = (await client.get("/account/positions", headers=headers)).json()
+    assert len(positions) == 1
+    # liquidation_price = 100 * (1 - 0.1 + 0.01) = 91
+    assert float(positions[0]["liquidation_price"]) == pytest.approx(91.0, rel=1e-4)
+
+    # Trigger price drop to 90, below liquidation price of 91
+    engine = MatchingEngine(feed.get_price, session_factory=TestSession)
+    await engine.on_price("BTC-USDT", Decimal("90"))
+
+    # Position should be liquidated (deleted)
+    positions_after = (await client.get("/account/positions", headers=headers)).json()
+    assert positions_after == []
